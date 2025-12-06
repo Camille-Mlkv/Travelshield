@@ -1,24 +1,30 @@
 const { ethers } = require("ethers");
 require("dotenv").config();
+const { log } = require("../utils/logger");
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-const contractAddress = process.env.CONTRACT_ADDRESS;
-const contractABI = [
-    "function markEventOccurred(uint256 policyId, string memory eventType) public",
-    "event EventTriggered(uint256 policyId, string eventType)"
-];
 
-const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+const contract = new ethers.Contract(
+    process.env.CONTRACT_ADDRESS,
+    [
+        "function markEventOccurred(uint256 policyId, string eventType) public",
+        "event EventTriggered(uint256 policyId, string eventType)"
+    ],
+    wallet
+);
 
 async function markEventOccurred(policyId, eventType) {
     try {
+        log(`Calling markEventOccurred: policy=${policyId}, event=${eventType}`);
+
         const tx = await contract.markEventOccurred(policyId, eventType);
-        console.log(`Transaction sent: ${tx.hash}`);
-        await tx.wait();
-        console.log(`Transaction confirmed: ${tx.hash}`);
+
+        log(`Transaction sent: ${tx.hash}`);
+        const receipt = await tx.wait();
+        log(`Transaction confirmed. Block: ${receipt.blockNumber}`);
     } catch (err) {
-        console.error("Error calling contract:", err);
+        log("Contract error: " + err.message);
     }
 }
 

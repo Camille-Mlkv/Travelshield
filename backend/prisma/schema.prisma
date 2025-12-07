@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PolicyStatus {
+  DRAFT
+  AWAITING_ONCHAIN
+  ACTIVE
+  EXPIRED
+  CLAIMED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  password_hash String
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  wallets       Wallet[]
+  policies      Policy[]
+  
+  @@map("users")
+}
+
+model Wallet {
+  id         String   @id @default(uuid())
+  address    String   @unique
+  label      String?
+  verified   Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  policies   Policy[]
+  
+  @@map("wallets")
+  @@index([user_id])
+  @@index([address])
+}
+
+model InsuranceModule {
+  id                  String   @id @default(uuid())
+  name                String
+  description         String?
+  fixed_payout_amount Decimal? @db.Decimal(10, 2)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  
+  policies            Policy[]
+  
+  @@map("insurance_modules")
+}
+
+model Policy {
+  id               String       @id @default(uuid())
+  chain_policy_id  BigInt?      @db.BigInt
+  token_address    String?
+  premium_amount   Decimal?     @db.Decimal(10, 2)
+  policy_data_hash String?
+  onchain_tx_hash  String?
+  status           PolicyStatus @default(DRAFT)
+  
+  flight_data_json Json?        @db.JsonB
+  
+  user_id          String
+  wallet_id        String
+  module_id        String
+  
+  user             User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  wallet           Wallet           @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+  module           InsuranceModule  @relation(fields: [module_id], references: [id], onDelete: Cascade)
+  
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  
+  @@map("policies")
+  @@index([user_id])
+  @@index([wallet_id])
+  @@index([module_id])
+  @@index([status])
+  @@index([created_at])
+}

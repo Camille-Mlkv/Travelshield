@@ -11,6 +11,12 @@ async function main() {
 
   console.log("Mock USDC deployed at:", await usdc.getAddress());
   console.log("Mock USDT deployed at:", await usdt.getAddress());
+
+  const Insurance = await ethers.getContractFactory("Insurance");
+  const insurance = await Insurance.deploy(await usdc.getAddress(), await usdt.getAddress());
+  await insurance.waitForDeployment();
+
+  console.log("Insurance deployed at:", await insurance.getAddress());
 }
 
 main();

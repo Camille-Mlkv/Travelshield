@@ -49,13 +49,13 @@ const HomePage = () => {
             className="btn-primary"
             onClick={() => navigate('/wallets')}
           >
-            📱 Кошельки
+            Кошельки
           </button>
           <button 
             className="btn-secondary"
             onClick={() => navigate('/policies')}
           >
-            📄 Мои полисы
+            Мои полисы
           </button>
         </div>
       </div>

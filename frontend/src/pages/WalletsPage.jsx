@@ -3,7 +3,7 @@ import './HomePage.css';
 const WalletsPage = () => {
   return (
     <div className="home-page">
-      <h1>👛 Мои кошельки</h1>
+      <h1>Мои кошельки</h1>
       <p>Страница управления кошельками</p>
       <div style={{ 
         padding: '40px', 

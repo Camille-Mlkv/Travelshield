@@ -77,7 +77,7 @@ const ModuleDetailsPage = () => {
           borderRadius: '16px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
-          <h3>📊 Детали покрытия</h3>
+          <h3>Детали покрытия</h3>
           <div style={{ marginTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #eee' }}>
               <span>Максимальная выплата:</span>
@@ -100,7 +100,7 @@ const ModuleDetailsPage = () => {
           borderRadius: '16px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
-          <h3>✅ Условия покрытия</h3>
+          <h3>Условия покрытия</h3>
           <ul style={{ marginTop: '20px', paddingLeft: '20px' }}>
             {module.conditions.map((condition, index) => (
               <li key={index} style={{ marginBottom: '10px', lineHeight: '1.5' }}>

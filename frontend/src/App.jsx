@@ -3,7 +3,7 @@ import Layout from './components/Layout/Layout';
 import HomePage from './pages/HomePage';
 import WalletsPage from './pages/WalletsPage.jsx';
 import PoliciesPage from './pages/PoliciesPage';
-import ModuleDetailsPage from './pages/ModuleDetailsPage.jsx/index.js';
+import ModuleDetailsPage from './pages/ModuleDetailsPage.jsx';
 import BuyPolicyPage from './pages/BuyPolicyPage';
 import './index.css';
 

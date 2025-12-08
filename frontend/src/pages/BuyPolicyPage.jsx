@@ -27,7 +27,7 @@ const BuyPolicyPage = () => {
 
   return (
     <div className="home-page">
-      <h1>📝 Покупка страхового полиса</h1>
+      <h1>Покупка страхового полиса</h1>
       
       <form onSubmit={handleSubmit} style={{ 
         maxWidth: '600px', 

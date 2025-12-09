@@ -4,6 +4,13 @@ import helmet from 'helmet'
 import 'dotenv/config'
 import router from './src/routes/index.js'
 import { errorHandler } from './src/middleware/error.middleware.js'
+import swaggerUi from 'swagger-ui-express'
+import fs from 'fs'
+import path from 'path'
+
+const swaggerFile = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), 'swagger-output.json'), 'utf8')
+);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,24 +30,17 @@ app.use((req, res, next) => {
   next();
 });
 
+
 app.use('/api', router);
+app.use('/api/doc', swaggerUi.serve, swaggerUi.setup(swaggerFile))
 app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 TravelShield API запущен на порту ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`⚡ Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📚 Swagger docs: http://localhost:${PORT}/api/doc`);
 });
 
-// Обработка graceful shutdown
-// process.on('SIGTERM', () => {
-//   console.log('SIGTERM signal received: closing HTTP server');
-//   process.exit(0);
-// });
-
-// process.on('SIGINT', () => {
-//   console.log('SIGINT signal received: closing HTTP server');
-//   process.exit(0);
-// });
 
 export default app;

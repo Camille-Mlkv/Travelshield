@@ -97,12 +97,12 @@ class BlockchainService {
         policyDataHash
       });
 
-      const isTokenAllowed = await this.contract.allowedTokens(tokenAddress);
-      console.log(`Token ${tokenAddress} allowed: ${isTokenAllowed}`);
+      // const isTokenAllowed = await this.contract.allowedTokens(tokenAddress);
+      // console.log(`Token ${tokenAddress} allowed: ${isTokenAllowed}`);
       
-      if (!isTokenAllowed) {
-        throw new Error(`Token ${tokenAddress} is not allowed`);
-      }
+      // if (!isTokenAllowed) {
+      //   throw new Error(`Token ${tokenAddress} is not allowed`);
+      // }
 
       const tx = await this.contract.buyPolicy(
         tokenAddress,

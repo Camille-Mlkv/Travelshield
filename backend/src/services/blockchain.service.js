@@ -3,7 +3,8 @@ import { logger } from '../utils/logger.js';
 
 class BlockchainService {
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(process.env.BLOCKCHAIN_RPC_URL);
+    // Для ethers v6
+    this.provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
     this.wallet = new ethers.Wallet(process.env.PRIVATE_KEY, this.provider);
     
     const abi = [
@@ -35,53 +36,70 @@ class BlockchainService {
   }
 
   computePolicyDataHash(policy) {
-    const dataToHash = {
-      offchainId: policy.id,
-      userId: policy.userId,
-      walletId: policy.walletId,
-      moduleId: policy.insuranceModuleId,
-      coverageAmount: policy.coverageAmount,
-      premiumAmount: policy.premiumAmount,
-      startDate: Math.floor(new Date(policy.startDate).getTime() / 1000),
-      endDate: Math.floor(new Date(policy.endDate).getTime() / 1000),
-      currency: policy.currency,
-      createdAt: Math.floor(new Date(policy.createdAt).getTime() / 1000)
-    };
+    try {
+      const dataToHash = {
+        offchainId: policy.id,
+        userId: policy.userId,
+        walletId: policy.walletId,
+        moduleId: policy.insuranceModuleId,
+        coverageAmount: policy.coverageAmount,
+        premiumAmount: policy.premiumAmount,
+        startDate: Math.floor(new Date(policy.startDate).getTime() / 1000),
+        endDate: Math.floor(new Date(policy.endDate).getTime() / 1000),
+        currency: policy.currency || 'USDC',
+        createdAt: Math.floor(new Date(policy.createdAt).getTime() / 1000)
+      };
 
-    const encodedData = ethers.utils.defaultAbiCoder.encode(
-      [
-        'string',  'string',  'string',  'string',
-        'uint256', 'uint256', 'uint256', 'uint256',
-        'string',  'uint256'
-      ],
-      [
-        dataToHash.offchainId,
-        dataToHash.userId,
-        dataToHash.walletId,
-        dataToHash.moduleId,
-        ethers.utils.parseUnits(dataToHash.coverageAmount.toString(), 6),
-        ethers.utils.parseUnits(dataToHash.premiumAmount.toString(), 6),
-        dataToHash.startDate,
-        dataToHash.endDate,
-        dataToHash.currency,
-        dataToHash.createdAt
-      ]
-    );
+      console.log('Data to hash:', dataToHash);
 
-    return ethers.utils.keccak256(encodedData);
+      const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+      
+      const encodedData = abiCoder.encode(
+        [
+          'string',  'string',  'string',  'string',
+          'uint256', 'uint256', 'uint256', 'uint256',
+          'string',  'uint256'
+        ],
+        [
+          dataToHash.offchainId,
+          dataToHash.userId,
+          dataToHash.walletId,
+          dataToHash.moduleId,
+          ethers.parseUnits(dataToHash.coverageAmount.toString(), 6),
+          ethers.parseUnits(dataToHash.premiumAmount.toString(), 6),
+          dataToHash.startDate,
+          dataToHash.endDate,
+          dataToHash.currency,
+          dataToHash.createdAt
+        ]
+      );
+
+      const hash = ethers.keccak256(encodedData);
+      console.log('Computed hash:', hash);
+      return hash;
+    } catch (error) {
+      console.error('Error computing policy hash:', error);
+      throw error;
+    }
   }
 
-  async buyPolicy(
-    tokenAddress,
-    amount,
-    startDate,
-    endDate,
-    policyDataHash
-  ){
+  async buyPolicy(tokenAddress, amount, startDate, endDate, policyDataHash) {
     try {
-      const amountInWei = ethers.utils.parseUnits(amount.toString(), 6);
+
+      const amountInWei = ethers.parseUnits(amount.toString(), 6);
+
+      console.log('Buying policy with params:', {
+        tokenAddress,
+        amount,
+        amountInWei: amountInWei.toString(),
+        startDate,
+        endDate,
+        policyDataHash
+      });
 
       const isTokenAllowed = await this.contract.allowedTokens(tokenAddress);
+      console.log(`Token ${tokenAddress} allowed: ${isTokenAllowed}`);
+      
       if (!isTokenAllowed) {
         throw new Error(`Token ${tokenAddress} is not allowed`);
       }
@@ -95,15 +113,31 @@ class BlockchainService {
         { gasLimit: 500000 }
       );
       
+      console.log('Transaction sent:', tx.hash);
+      
       const receipt = await tx.wait();
-      const event = receipt.events?.find((e) => e.event === 'PolicyCreated');
-      const policyId = event?.args?.policyId;
+      console.log('Transaction confirmed in block:', receipt.blockNumber);
+      
+      // Ищем событие PolicyCreated в логах
+      let policyId;
+      for (const log of receipt.logs) {
+        try {
+          const parsedLog = this.contract.interface.parseLog(log);
+          if (parsedLog && parsedLog.name === 'PolicyCreated') {
+            policyId = parsedLog.args.policyId;
+            console.log('Found PolicyCreated event, policyId:', policyId.toString());
+            break;
+          }
+        } catch (e) {
+          // Не наш лог, продолжаем
+        }
+      }
       
       logger.info(`Policy purchased on chain. Tx: ${tx.hash}, PolicyId: ${policyId?.toString()}`);
       
       return { 
         txHash: tx.hash, 
-        policyId: policyId ? policyId.toBigInt() : undefined 
+        policyId: policyId ? BigInt(policyId) : undefined 
       };
     } catch (error) {
       logger.error('Error buying policy on chain:', error);
@@ -117,13 +151,13 @@ class BlockchainService {
       
       return {
         user: policyData.user,
-        premiumPaid: ethers.utils.formatUnits(policyData.premiumPaid, 6),
-        startDate: new Date(policyData.startDate.toNumber() * 1000),
-        endDate: new Date(policyData.endDate.toNumber() * 1000),
+        premiumPaid: ethers.formatUnits(policyData.premiumPaid, 6),
+        startDate: new Date(Number(policyData.startDate) * 1000),
+        endDate: new Date(Number(policyData.endDate) * 1000),
         policyDataHash: policyData.policyDataHash,
         token: policyData.token,
-        createdAt: new Date(policyData.createdAt.toNumber() * 1000),
-        isActive: new Date(policyData.endDate.toNumber() * 1000) > new Date()
+        createdAt: new Date(Number(policyData.createdAt) * 1000),
+        isActive: new Date(Number(policyData.endDate) * 1000) > new Date()
       };
     } catch (error) {
       logger.error('Error fetching policy from chain:', error);
@@ -136,10 +170,10 @@ class BlockchainService {
       const claimData = await this.contract.claims(claimId);
       
       return {
-        policyId: claimData.policyId.toBigInt(),
-        payoutAmount: ethers.utils.formatUnits(claimData.payoutAmount, 6),
+        policyId: BigInt(claimData.policyId),
+        payoutAmount: ethers.formatUnits(claimData.payoutAmount, 6),
         paid: claimData.paid,
-        createdAt: new Date(claimData.createdAt.toNumber() * 1000)
+        createdAt: new Date(Number(claimData.createdAt) * 1000)
       };
     } catch (error) {
       logger.error('Error fetching claim from chain:', error);
@@ -148,15 +182,16 @@ class BlockchainService {
   }
 
   listenToEvents(callback) {
+    // Подписываемся на события контракта
     this.contract.on('PolicyCreated', 
       (policyId, user, premiumPaid, startDate, endDate, policyDataHash, token, event) => {
         callback({
           event: 'PolicyCreated',
-          policyId: policyId.toBigInt(),
+          policyId: BigInt(policyId),
           user,
-          premiumPaid: ethers.utils.formatUnits(premiumPaid, 6),
-          startDate: new Date(startDate.toNumber() * 1000),
-          endDate: new Date(endDate.toNumber() * 1000),
+          premiumPaid: ethers.formatUnits(premiumPaid, 6),
+          startDate: new Date(Number(startDate) * 1000),
+          endDate: new Date(Number(endDate) * 1000),
           policyDataHash,
           token,
           transactionHash: event.transactionHash
@@ -168,10 +203,10 @@ class BlockchainService {
       (claimId, policyId, user, amount, token, eventType, event) => {
         callback({
           event: 'ClaimPaid',
-          claimId: claimId.toBigInt(),
-          policyId: policyId.toBigInt(),
+          claimId: BigInt(claimId),
+          policyId: BigInt(policyId),
           user,
-          amount: ethers.utils.formatUnits(amount, 6),
+          amount: ethers.formatUnits(amount, 6),
           token,
           eventType,
           transactionHash: event.transactionHash
@@ -179,10 +214,69 @@ class BlockchainService {
       }
     );
 
+    this.contract.on('OracleAdded', 
+      (oracle, event) => {
+        callback({
+          event: 'OracleAdded',
+          oracle,
+          transactionHash: event.transactionHash
+        });
+      }
+    );
+
+    // Возвращаем функцию для отписки
     return () => {
-      this.contract.removeAllListeners('PolicyCreated');
-      this.contract.removeAllListeners('ClaimPaid');
+      this.contract.removeAllListeners();
     };
+  }
+
+  async testConnection() {
+    try {
+      console.log('Testing blockchain connection...');
+      
+      // 1. Проверяем подключение к ноде
+      const blockNumber = await this.provider.getBlockNumber();
+      console.log(`Connected to network. Current block: ${blockNumber}`);
+      
+      // 2. Проверяем баланс кошелька
+      const balance = await this.provider.getBalance(this.wallet.address);
+      console.log(`Wallet ${this.wallet.address} balance: ${ethers.formatEther(balance)} ETH`);
+      
+      // 3. Проверяем доступ к контракту
+      try {
+        const owner = await this.contract.owner();
+        console.log(`Contract owner: ${owner}`);
+        
+        const policyCount = await this.contract.policyCount();
+        console.log(`Total policies in contract: ${policyCount}`);
+        
+        return {
+          success: true,
+          network: 'connected',
+          blockNumber,
+          wallet: this.wallet.address,
+          balance: ethers.formatEther(balance),
+          contractOwner: owner,
+          policyCount: Number(policyCount)
+        };
+      } catch (contractError) {
+        console.log('Contract exists but may not have all functions:', contractError.message);
+        return {
+          success: true,
+          network: 'connected',
+          blockNumber,
+          wallet: this.wallet.address,
+          balance: ethers.formatEther(balance),
+          contractAccess: 'limited'
+        };
+      }
+    } catch (error) {
+      console.error('Blockchain connection test failed:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
 

@@ -5,7 +5,6 @@ import blockchainService from '../services/blockchain.service.js';
 const prisma = new PrismaClient();
 
 class PoliciesController {
-  // Создание полиса в статусе DRAFT
   async createPolicy(req, res) {
     try {
       const {
@@ -20,34 +19,20 @@ class PoliciesController {
         policyData
       } = req.body;
 
-      // Проверяем существование модуля
-      const module = await prisma.insuranceModule.findUnique({
-        where: { id: insuranceModuleId },
+      console.log('Creating policy for user:', userId);
+
+      // Находим кошелек пользователя
+      const wallet = await prisma.wallet.findUnique({
+        where: { id: walletId }
       });
 
-      if (!module) {
-        return res.status(404).json({ error: 'Insurance module not found' });
-      }
-
-      // Проверяем лимиты модуля
-      if (coverageAmount < module.minCoverage || coverageAmount > module.maxCoverage) {
-        return res.status(400).json({ 
-          error: `Coverage amount must be between ${module.minCoverage} and ${module.maxCoverage}` 
+      if (!wallet) {
+        return res.status(404).json({ 
+          success: false,
+          error: 'Wallet not found' 
         });
       }
 
-      // Проверяем длительность
-      const durationDays = Math.ceil(
-        (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      
-      if (durationDays < module.minDuration || durationDays > module.maxDuration) {
-        return res.status(400).json({ 
-          error: `Policy duration must be between ${module.minDuration} and ${module.maxDuration} days` 
-        });
-      }
-
-      // Создаем полис
       const policy = await prisma.policy.create({
         data: {
           userId,
@@ -55,114 +40,132 @@ class PoliciesController {
           insuranceModuleId,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
-          coverageAmount,
-          premiumAmount,
-          currency,
+          coverageAmount: parseFloat(coverageAmount),
+          premiumAmount: parseFloat(premiumAmount),
+          currency: currency || 'USDC',
           policyData: policyData || {},
           status: 'DRAFT'
-        },
-        include: {
-          insuranceModule: true,
-          wallet: true
         }
       });
 
-      // Вычисляем хэш данных полиса
-      const policyDataHash = blockchainService.computePolicyDataHash(policy);
-
-      // Обновляем полис с хэшем
-      const updatedPolicy = await prisma.policy.update({
-        where: { id: policy.id },
-        data: { policyDataHash }
-      });
-
       res.status(201).json({
+        success: true,
         message: 'Policy created as draft',
         policyId: policy.id,
-        policyDataHash,
-        status: policy.status
+        status: policy.status,
+        userWallet: wallet.address
       });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('Create policy error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to create policy' 
+      });
     }
   }
 
-  // Оплата полиса и вызов buyPolicy в контракте
   async payPolicy(req, res) {
     try {
       const { policyId, tokenAddress } = req.body;
       
+      console.log('Pay policy request:', { policyId, tokenAddress });
+
+      // Находим полис
       const policy = await prisma.policy.findUnique({
         where: { id: policyId },
-        include: { 
-          wallet: true,
-          insuranceModule: true 
-        }
+        include: { wallet: true }
       });
 
       if (!policy) {
-        return res.status(404).json({ error: 'Policy not found' });
+        return res.status(404).json({ 
+          success: false,
+          error: 'Policy not found' 
+        });
       }
 
       if (policy.status !== 'DRAFT') {
-        return res.status(400).json({ error: 'Policy is not in DRAFT status' });
+        return res.status(400).json({ 
+          success: false,
+          error: `Policy is not in DRAFT status (current: ${policy.status})` 
+        });
       }
 
-      if (!policy.policyDataHash) {
-        return res.status(400).json({ error: 'Policy data hash not found' });
-      }
+      const userAddress = policy.wallet.address;
+      console.log('User wallet address:', userAddress);
 
-      // Проверяем, разрешен ли токен
-      const isTokenAllowed = await blockchainService.isTokenAllowed(tokenAddress);
-      if (!isTokenAllowed) {
-        return res.status(400).json({ error: 'Token is not allowed for payments' });
-      }
+      // Обновляем статус
+      await prisma.policy.update({
+        where: { id: policyId },
+        data: { 
+          status: 'AWAITING_ONCHAIN',
+          tokenAddress 
+        }
+      });
 
-      // Конвертируем даты в timestamp
-      const startDateTimestamp = Math.floor(new Date(policy.startDate).getTime() / 1000);
-      const endDateTimestamp = Math.floor(new Date(policy.endDate).getTime() / 1000);
+      // Вычисляем хэш
+      const policyDataHash = blockchainService.computePolicyDataHash(policy);
+      
+      // Даты в timestamp
+      const startTimestamp = Math.floor(new Date(policy.startDate).getTime() / 1000);
+      const endTimestamp = Math.floor(new Date(policy.endDate).getTime() / 1000);
 
-      // Вызываем buyPolicy в контракте
+      // Пробуем купить полис
       const { txHash, policyId: chainPolicyId } = await blockchainService.buyPolicy(
         tokenAddress,
         policy.premiumAmount,
-        startDateTimestamp,
-        endDateTimestamp,
-        policy.policyDataHash
+        startTimestamp,
+        endTimestamp,
+        policyDataHash,
+        userAddress
       );
 
       // Обновляем полис
       const updatedPolicy = await prisma.policy.update({
         where: { id: policyId },
         data: {
-          status: 'AWAITING_ONCHAIN',
-          tokenAddress,
           onchainTxHash: txHash,
-          ...(chainPolicyId && { chainPolicyId })
+          policyDataHash,
+          ...(chainPolicyId && { chainPolicyId }),
+          status: chainPolicyId ? 'ACTIVE' : 'AWAITING_ONCHAIN'
         }
       });
 
       res.status(200).json({
-        message: 'Payment initiated successfully',
+        success: true,
+        message: chainPolicyId ? 'Policy purchased successfully' : 'Payment in progress',
         txHash,
         chainPolicyId: chainPolicyId?.toString(),
-        status: updatedPolicy.status,
-        policyDataHash: policy.policyDataHash
+        status: updatedPolicy.status
       });
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('Pay policy error:', error);
       
-      // Обновляем статус полиса в случае ошибки
+      // Возвращаем в DRAFT при ошибке
       await prisma.policy.update({
         where: { id: req.body.policyId },
-        data: { status: 'DRAFT' } // Возвращаем в DRAFT при ошибке
+        data: { status: 'DRAFT' }
       });
 
-      res.status(500).json({ 
-        error: error.message || 'Failed to process payment' 
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        userMessage: this.getUserFriendlyError(error.message)
       });
     }
+  };
+
+  // Вспомогательный метод для понятных сообщений об ошибках
+  getUserFriendlyError(errorMessage) {
+    if (errorMessage.includes('Token approval required')) {
+      return 'Please approve the contract to spend your tokens first. Go to your wallet and approve the transaction.';
+    } else if (errorMessage.includes('Insufficient token balance')) {
+      return 'Insufficient token balance. Please add more tokens to your wallet.';
+    } else if (errorMessage.includes('Token not allowed')) {
+      return 'This token is not accepted for payments.';
+    } else if (errorMessage.includes('Not approved')) {
+      return 'Token approval required. Please approve the contract first.';
+    }
+    return 'Payment failed. Please try again.';
   }
 
   // Получение списка полисов пользователя

@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PolicyStatus {
+  DRAFT
+  AWAITING_ONCHAIN
+  ACTIVE
+  EXPIRED
+  CLAIMED
+  REJECTED
+}
+
+enum Currency {
+  USDT
+  USDC
+  ETH
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  password_hash String
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  wallets       Wallet[]
+  policies      Policy[]
+  
+  @@map("users")
+}
+
+model Wallet {
+  id         String   @id @default(uuid())
+  address    String   @unique
+  label      String?
+  verified   Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  policies   Policy[]
+  
+  @@map("wallets")
+  @@index([user_id])
+  @@index([address])
+}
+
+model InsuranceModule {
+  id                  String   @id @default(uuid())
+  name                String
+  description         String?
+  fixed_payout_amount Decimal? @db.Decimal(10, 2)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  
+  policies            Policy[]
+  
+  @@map("insurance_modules")
+}
+
+model Policy {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  walletId        String
+  wallet          Wallet        @relation(fields: [walletId], references: [id])
+  insuranceModuleId String
+  insuranceModule  InsuranceModule @relation(fields: [insuranceModuleId], references: [id])
+  status          PolicyStatus  @default(DRAFT)
+  startDate       DateTime
+  endDate         DateTime
+  coverageAmount  Float         // Страховая сумма
+  premiumAmount   Float         // Сумма премии
+  currency        Currency
+  tokenAddress    String?       // Адрес токена (USDC/USDT)
+  chainPolicyId   BigInt?       // ID полиса в смарт-контракте (uint256)
+  policyDataHash  String?       @unique // Хэш данных полиса (bytes32)
+  onchainTxHash   String?
+  claimTxHash     String?
+  policyData      Json          // Дополнительные данные полиса
+  metadata        Json?         // Метаданные
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([walletId])
+  @@index([policyDataHash])
+}

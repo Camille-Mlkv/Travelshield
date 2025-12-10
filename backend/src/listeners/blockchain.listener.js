@@ -1,5 +1,5 @@
 import { BlockchainService } from '../services/blockchain.service';
-import { PrismaClient, PolicyStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
 import blockchainService from '../services/blockchain.service';
 

@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import './HomePage.css';
 
-const ModuleDetailsPage = () => {
+const ModuleDetailsPage = ({isAuthenticated}) => {
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -57,12 +57,16 @@ const ModuleDetailsPage = () => {
       <div className="hero-section" style={{ background: `linear-gradient(135deg, ${module.color} 0%, ${module.color}80 100%)` }}>
         <h1>{module.title}</h1>
         <p>{module.description}</p>
-        <button 
-          className="btn-primary"
-          onClick={() => navigate(`/buy/${id}`)}
-        >
-          🛒 Купить покрытие
-        </button>
+        {isAuthenticated ? (
+          <>
+          <button 
+            className="btn-primary"
+            onClick={() => navigate(`/buy/${id}`)}
+            >
+            🛒 Купить покрытие
+          </button>
+        </> 
+        ) : null}
       </div>
 
       <div style={{ 

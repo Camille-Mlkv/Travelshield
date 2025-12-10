@@ -1,4 +1,4 @@
-import { PrismaClient, PolicyStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { ethers } from 'ethers';
 import blockchainService from '../services/blockchain.service.js';
 

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import InsuranceModuleCard from '../components/Cards/InsuranceModuleCard.jsx';
 import './HomePage.css';
 
-const HomePage = () => {
+const HomePage = ({ isAuthenticated }) => {
   const navigate = useNavigate();
   
   const insuranceModules = [
@@ -44,20 +44,24 @@ const HomePage = () => {
       <div className="hero-section">
         <h1>TravelShield Insurance</h1>
         <p>Децентрализованное страхование путешествий</p>
-        <div className="quick-actions">
-          <button 
-            className="btn-primary"
-            onClick={() => navigate('/wallets')}
-          >
-            Кошельки
-          </button>
-          <button 
-            className="btn-secondary"
-            onClick={() => navigate('/policies')}
-          >
-            Мои полисы
-          </button>
-        </div>
+        {isAuthenticated ? (
+          <>
+          <div className="quick-actions">
+            <button 
+              className="btn-primary"
+              onClick={() => navigate('/wallets')}
+            >
+              Кошельки
+            </button>
+            <button 
+              className="btn-secondary"
+              onClick={() => navigate('/policies')}
+            >
+              Мои полисы
+            </button>
+          </div>
+        </> 
+        ) : null}
       </div>
       
       <div className="modules-section">

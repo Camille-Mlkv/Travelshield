@@ -13,7 +13,8 @@
     "docker:restart": "docker compose restart",
     "docker:rebuild": "docker compose down && docker compose up -d --build",
     "setup": "npm run docker:up && npm run prisma:init",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "swagger": "node ./swagger.js"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +32,8 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "prisma": "^6.19.0",
+    "swagger-autogen": "^2.23.7",
+    "swagger-ui-express": "^5.0.1",
     "web3": "^4.16.0",
     "winston": "^3.18.3"
   },

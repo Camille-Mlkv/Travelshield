@@ -19,7 +19,7 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes);
 router.use('/wallets', walletRoutes);
 router.use('/modules', moduleRoutes);
-router.use('oracle/', oracleRoutes);
+router.use('/oracle', oracleRoutes);
 router.use('/policy', policyRoutes)
 
 

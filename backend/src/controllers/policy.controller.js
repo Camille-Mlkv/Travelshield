@@ -149,7 +149,7 @@ class PoliciesController {
       res.status(500).json({
         success: false,
         error: error.message,
-        userMessage: this.getUserFriendlyError(error.message)
+        // userMessage: this.getUserFriendlyError(error.message)
       });
     }
   };

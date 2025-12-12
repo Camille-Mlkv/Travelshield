@@ -1,30 +1,70 @@
 // src/services/wallet.service.js
 import walletRepository from '../repositories/wallet.repository.js';
+import { ethers } from 'ethers';
+
+const erc20Abi = [
+  "function transfer(address to, uint256 amount) external returns (bool)",
+  "function transferFrom(address from, address to, uint256 amount) external returns (bool)",
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function name() view returns (string)"
+];
 
 class WalletService {
 
   async addWallet(userId, walletData) {
-    try {
-      if (!this.isValidEthereumAddress(walletData.address)) {
-        throw new Error('Неверный формат адреса Ethereum');
-      }
+     try {
+    const wallet = ethers.Wallet.createRandom();
 
-      const existingWallet = await walletRepository.findByAddress(walletData.address);
-      if (existingWallet) {
-        throw new Error('Этот кошелек уже привязан к другому пользователю');
-      }
+    const privateKey = wallet.privateKey;
+    const address = wallet.address;
 
-      const wallet = await walletRepository.create({
-        address: walletData.address,
-        label: walletData.label,
-        verified: false, 
-        user_id: userId,
-      });
+    const saved = await walletRepository.create({
+      user_id: userId,
+      abel: walletData.label,
+      address,
+      //privateKey, // У нас в структуре БД его нет, что правильно с т.з. безопасности
+      verified: true
+    });
 
-      return wallet;
-    } catch (error) {
-      throw error;
-    }
+    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
+    const deployer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+    const usdc = new ethers.Contract(process.env.USDC_ADDRESS, erc20Abi, deployer);
+    const usdt = new ethers.Contract(process.env.USDT_ADDRESS, erc20Abi, deployer);
+
+    const decimalsUsdc = await usdc.decimals();
+    const decimalsUsdt = await usdt.decimals();
+    const initialAmountHuman = "500000"; // 500k
+    const initialUsdc = ethers.parseUnits(initialAmountHuman, decimalsUsdc);
+    const initialUsdt = ethers.parseUnits(initialAmountHuman, decimalsUsdt);
+
+    const deployerAddress = await deployer.getAddress();
+    let nonce = await provider.getTransactionCount(deployerAddress, "latest");
+
+    const tx1 = await usdc.transfer(address, initialUsdc, { nonce });
+    console.log("USDC transfer sent, hash:", tx1.hash, "nonce:", nonce);
+    await tx1.wait();
+    console.log("USDC transfer confirmed");
+    nonce++;
+
+    const tx2 = await usdt.transfer(address, initialUsdt, { nonce });
+    console.log("USDT transfer sent, hash:", tx2.hash, "nonce:", nonce);
+    await tx2.wait();
+    console.log("USDT transfer confirmed");
+
+    return {
+      address,
+      privateKey // выведется в консоли - именно он используется в blockchain.service 
+    };
+    // предлагаю хранить privateKey в БД - это хоть и не best practice, но по другому никак
+    // и передавать его в метод buyPolicy в blockchain.service
+
+  } catch (err) {
+    console.error("Wallet creation failed:", err);
+    throw err;
+  }
   }
 
 
@@ -78,121 +118,6 @@ class WalletService {
       timestamp,
     };
   }
-
-//   async updateWallet(walletId, userId, updateData) {
-//     try {
-//       // Проверяем существование и принадлежность кошелька
-//       const wallet = await walletRepository.findById(walletId);
-      
-//       if (!wallet) {
-//         throw new Error('Кошелек не найден');
-//       }
-
-//       if (wallet.user_id !== userId) {
-//         throw new Error('Доступ запрещен');
-//       }
-
-//       // Обновляем только разрешенные поля
-//       const allowedUpdates = ['label'];
-//       const filteredUpdates = {};
-      
-//       Object.keys(updateData).forEach(key => {
-//         if (allowedUpdates.includes(key)) {
-//           filteredUpdates[key] = updateData[key];
-//         }
-//       });
-
-//       // Если нет полей для обновления
-//       if (Object.keys(filteredUpdates).length === 0) {
-//         throw new Error('Нет данных для обновления');
-//       }
-
-//       const updatedWallet = await walletRepository.update(walletId, filteredUpdates);
-//       return updatedWallet;
-//     } catch (error) {
-//       throw error;
-//     }
-//   }
-
-//   /**
-//    * Удаление кошелька
-//    */
-//   async deleteWallet(walletId, userId) {
-//     try {
-//       // Проверяем существование и принадлежность кошелька
-//       const wallet = await walletRepository.findById(walletId);
-      
-//       if (!wallet) {
-//         throw new Error('Кошелек не найден');
-//       }
-
-//       if (wallet.user_id !== userId) {
-//         throw new Error('Доступ запрещен');
-//       }
-
-//       // Проверяем есть ли активные полисы
-//       const activePolicies = wallet.policies?.filter(
-//         policy => policy.status === 'ACTIVE' || policy.status === 'AWAITING_ONCHAIN'
-//       );
-
-//       if (activePolicies && activePolicies.length > 0) {
-//         throw new Error('Нельзя удалить кошелек с активными полисами');
-//       }
-
-//       await walletRepository.delete(walletId);
-//       return { success: true, message: 'Кошелек успешно удален' };
-//     } catch (error) {
-//       throw error;
-//     }
-//   }
-
-//   /**
-//    * Верификация кошелька (заглушка для будущей реализации)
-//    */
-//   async verifyWallet(walletId, userId, signature) {
-//     try {
-//       // TODO: Реализовать проверку подписи
-//       // Пока просто отмечаем как верифицированный
-//       const wallet = await walletRepository.findById(walletId);
-      
-//       if (!wallet) {
-//         throw new Error('Кошелек не найден');
-//       }
-
-//       if (wallet.user_id !== userId) {
-//         throw new Error('Доступ запрещен');
-//       }
-
-//       // Симуляция проверки подписи
-//       const isSignatureValid = await this.verifyEthereumSignature(
-//         wallet.address,
-//         signature
-//       );
-
-//       if (!isSignatureValid) {
-//         throw new Error('Неверная подпись');
-//       }
-
-//       const updatedWallet = await walletRepository.update(walletId, {
-//         verified: true,
-//       });
-
-//       return updatedWallet;
-//     } catch (error) {
-//       throw error;
-//     }
-//   }
-
-//   /**
-//    * Получение статистики по кошелькам
-//    */
-//   async getWalletStats(userId) {
-//     try {
-//       return await walletRepository.getUserWalletStats(userId);
-//     } catch (error) {
-//       throw error;
-//     }
-//   }
 }
 
 export default new WalletService();

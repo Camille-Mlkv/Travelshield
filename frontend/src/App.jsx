@@ -8,6 +8,7 @@ import WalletsPage from './pages/WalletsPage.jsx';
 import PoliciesPage from './pages/PoliciesPage';
 import ModuleDetailsPage from './pages/ModuleDetailsPage.jsx';
 import BuyPolicyPage from './pages/BuyPolicyPage';
+import PolicyDetailsPage from './pages/PolicyDetailsPage';
 import './index.css';
 
 function App() {
@@ -105,6 +106,7 @@ function App() {
                 <BuyPolicyPage />
             } 
           />
+          <Route path="/policies/:policyId" element={<PolicyDetailsPage />} />
         </Routes>
       </Layout>
     </Router>

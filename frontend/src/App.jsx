@@ -1,60 +1,114 @@
-import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
-import './App.css';
-
-import Home from './pages/Home.jsx';
-import Wallets from './pages/Wallets.jsx';
-import Policies from './pages/Policies.jsx';
-import ModuleDetail from './pages/ModuleDetail.jsx';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout/Layout';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import HomePage from './pages/HomePage';
+import WalletsPage from './pages/WalletsPage.jsx';
+import PoliciesPage from './pages/PoliciesPage';
+import ModuleDetailsPage from './pages/ModuleDetailsPage.jsx';
+import BuyPolicyPage from './pages/BuyPolicyPage';
+import PolicyDetailsPage from './pages/PolicyDetailsPage';
+import './index.css';
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [userData, setUserData] = useState(null);
 
-  // Установка фиктивного currentUserId
-  document.cookie = "currentUserId=12345";
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userId = localStorage.getItem('userId');
+    
+    if (token && userId) {
+      setIsAuthenticated(true);
+      setCurrentUserId(userId);
+      
+      const userEmail = localStorage.getItem('userEmail');
+      const userName = localStorage.getItem('userName');
+      setUserData({
+        id: userId,
+        email: userEmail,
+        name: userName
+      });
+    }
+  }, []);
+
+  const handleLogin = (userId, user = null) => {
+    console.log('handleLogin called with:', userId, user);
+    setIsAuthenticated(true);
+    setCurrentUserId(userId);
+    
+    if (user) {
+      setUserData(user);
+      localStorage.setItem('userEmail', user.email);
+      localStorage.setItem('userName', user.name || '');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
+    setIsAuthenticated(false);
+    setCurrentUserId('');
+    setUserData(null);
+  };
 
   return (
     <Router>
-      <div className="app-container">
-
-        {/* Хедер */}
-        <header className="header">
-          <div className="header-content">
-            <div className="logo-container">
-              <a href="https://vite.dev" target="_blank" rel="noreferrer">
-                <img src={viteLogo} className="logo" alt="Vite logo" />
-              </a>
-              <a href="https://react.dev" target="_blank" rel="noreferrer">
-                <img src={reactLogo} className="logo react" alt="React logo" />
-              </a>
-            </div>
-            <h1 className="app-title">TravelShield</h1>
-          </div>
-
-          {/* Навигация прямо в хедере */}
-          <nav className="header-nav">
-            <Link to="/"><button>Главная</button></Link>
-            <Link to="/wallets"><button>Кошельки</button></Link>
-            <Link to="/policies"><button>Полисы</button></Link>
-          </nav>
-        </header>
-
-        {/* Основной контент */}
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/wallets" element={<Wallets />} />
-            <Route path="/policies" element={<Policies />} />
-            <Route path="/module/:id" element={<ModuleDetail />} />
-          </Routes>
-          <p className="read-the-docs">
-            Click on the Vite and React logos to learn more
-          </p>
-        </main>
-
-      </div>
+      <Layout
+        isAuthenticated={isAuthenticated}
+        currentUserId={currentUserId}
+        onLogout={handleLogout}
+        userData={userData}
+      >  
+        <Routes>
+          <Route path="/" element={<HomePage isAuthenticated={isAuthenticated} />} />
+          <Route 
+            path="/login" 
+            element={
+              !isAuthenticated ? 
+                <LoginPage onLogin={handleLogin} /> : 
+                <Navigate to="/" />
+            } 
+          />
+          <Route 
+            path="/register" 
+            element={
+              !isAuthenticated ? 
+                <RegisterPage onRegister={handleLogin} /> : 
+                <Navigate to="/" />
+            } 
+          />
+          <Route 
+            path="/wallets" 
+            element={
+              <WalletsPage />
+            } 
+          />
+          <Route 
+            path="/policies" 
+            element={
+              <PoliciesPage />
+            } 
+          />
+          <Route 
+            path="/module/:id" 
+            element={
+              <ModuleDetailsPage isAuthenticated={isAuthenticated} />
+            } 
+          />
+          <Route 
+            path="/buy/:moduleId" 
+            element={
+                <BuyPolicyPage />
+            } 
+          />
+          <Route path="/policies/:policyId" element={<PolicyDetailsPage />} />
+        </Routes>
+      </Layout>
     </Router>
   );
 }
